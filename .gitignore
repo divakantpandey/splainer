@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+uv.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing & coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# ruff
+.ruff_cache/
+
+# ANTLR generated files (regenerated at build time)
+src/spl_to_sql/parser/generated/*.py
+src/spl_to_sql/parser/generated/*.tokens
+src/spl_to_sql/parser/generated/*.interp
+!src/spl_to_sql/parser/generated/.gitkeep
+
+# Environment variables
+.env
+.env.*
+
+# Distribution / packaging
+*.tar.gz
+*.whl

@@ -1,0 +1,110 @@
+# Build backend: hatchling — chosen over setuptools for simpler src/ layout support,
+# no setup.cfg/setup.py needed, and native PEP 621 metadata.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spl-to-sql"
+version = "0.1.0"
+description = "Translate Splunk SPL queries into SQL"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [
+    { name = "spl-to-sql contributors" },
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Software Development :: Code Generators",
+    "Typing :: Typed",
+]
+dependencies = [
+    "antlr4-python3-runtime",
+    "pydantic",
+    "pydantic-settings",
+    "click",
+    "tenacity",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pre-commit",
+]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+]
+
+[project.scripts]
+spl-to-sql = "spl_to_sql.cli:main"
+
+[project.urls]
+Repository = "https://github.com/TODO/spl-to-sql"
+Documentation = "https://github.com/TODO/spl-to-sql#readme"
+"Issue Tracker" = "https://github.com/TODO/spl-to-sql/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spl_to_sql"]
+
+# --- Tool configurations ---
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+line-length = 99
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+    "RUF",   # ruff-specific
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["spl_to_sql"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+mypy_path = "src"
+packages = ["spl_to_sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=spl_to_sql --cov-report=term-missing"
+markers = [
+    "integration: marks tests requiring live external services (LLM, DB) — excluded from default CI run",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["spl_to_sql"]
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
