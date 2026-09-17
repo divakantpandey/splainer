@@ -1,0 +1,67 @@
+services:
+  splunk:
+    image: splunk/splunk:latest
+    container_name: splunk-test
+    platform: linux/amd64
+    hostname: splunk
+    environment:
+      - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-SplunkTestPassword123!}
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN:-00000000-0000-0000-0000-000000000000}
+    ports:
+      - "${SPLUNK_WEB_PORT:-8000}:8000"
+      - "${SPLUNK_API_PORT:-8089}:8089"
+      - "${SPLUNK_HEC_PORT:-8088}:8088"
+    volumes:
+      - splunk-var:/opt/splunk/var
+      - splunk-etc:/opt/splunk/etc
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k -s https://localhost:8089/services/server/info || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-test
+    hostname: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-testdb}
+      - MYSQL_USER=${MYSQL_USER:-spluser}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-splpassword}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  migrator:
+    image: python:3.11-slim
+    container_name: spl-migrator
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ..:/app
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app/src
+      - DB_CONNECTION_STRING=mysql+pymysql://${MYSQL_USER:-spluser}:${MYSQL_PASSWORD:-splpassword}@mysql:3306/${MYSQL_DATABASE:-testdb}
+    command: >
+      sh -c "pip install --no-cache-dir alembic sqlalchemy pymysql cryptography && alembic upgrade head"
+    restart: "no"
+
+volumes:
+  splunk-var:
+  splunk-etc:
+  mysql-data:

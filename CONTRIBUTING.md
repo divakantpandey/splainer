@@ -31,7 +31,7 @@ uv run pytest --cov=spl_to_sql --cov-report=html
 uv run pytest tests/parser/test_listener.py
 ```
 
-Integration tests (requiring live LLM or DB connections) are excluded from the default run. To include them:
+Integration tests (requiring live LLM or DB connections) are excluded from the default run. To run against local test infrastructure, start the containers (`docker compose -f infra/docker-compose.yml up -d`) and run:
 
 ```bash
 uv run pytest -m integration
@@ -47,8 +47,8 @@ This project uses:
 Pre-commit hooks enforce these automatically. To run manually:
 
 ```bash
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
+uv run ruff check src/ tests/ migrations/
+uv run ruff format src/ tests/ migrations/
 uv run mypy src/
 ```
 

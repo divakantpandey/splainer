@@ -45,6 +45,11 @@ src/spl_to_sql/parser/generated/*.interp
 # Environment variables
 .env
 .env.*
+!.env.example
+
+# Agent docs and plans (not tracked for now)
+doc/
+!doc/.gitkeep
 
 # Distribution / packaging
 *.tar.gz
