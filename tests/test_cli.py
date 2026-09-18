@@ -27,14 +27,14 @@ class TestMainGroup:
 class TestTranslateCommand:
     """Tests for the translate command."""
 
-    def test_translate_not_implemented(self, simple_spl_query: str) -> None:
-        """The translate command raises NotImplementedError (stub)."""
+    def test_translate_success(self, simple_spl_query: str) -> None:
         runner = CliRunner()
-        result = runner.invoke(main, ["translate", simple_spl_query])
-        assert result.exit_code != 0
+        result = runner.invoke(main, ["translate", "search index=main"])
+        assert result.exit_code == 0
+        assert "SELECT" in result.output
 
     def test_translate_with_dialect(self) -> None:
-        """The translate command accepts a --dialect option."""
         runner = CliRunner()
         result = runner.invoke(main, ["translate", "--dialect", "snowflake", "search index=main"])
-        assert result.exit_code != 0  # NotImplementedError
+        assert result.exit_code == 0
+        assert "SELECT" in result.output

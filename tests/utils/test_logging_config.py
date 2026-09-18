@@ -10,7 +10,6 @@ from spl_to_sql.utils.logging_config import configure_logging
 class TestConfigureLogging:
     """Tests for configure_logging stub."""
 
-    def test_configure_logging_not_implemented(self) -> None:
-        """configure_logging() raises NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            configure_logging()
+    def test_configure_logging(self) -> None:
+        from spl_to_sql.utils.logging_config import configure_logging
+        configure_logging("DEBUG")

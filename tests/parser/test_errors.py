@@ -35,21 +35,23 @@ class TestSPLErrorCollector:
         collector = SPLErrorCollector()
         assert collector.errors == []
 
-    def test_syntax_error_not_implemented(self) -> None:
-        """syntax_error() raises NotImplementedError."""
+    def test_syntax_error(self) -> None:
         collector = SPLErrorCollector()
-        with pytest.raises(NotImplementedError):
-            collector.syntax_error(
-                recognizer=MagicMock(),
-                offending_symbol=MagicMock(),
-                line=1,
-                column=0,
-                msg="test error",
-                e=None,
-            )
+        mock_symbol = MagicMock()
+        mock_symbol.text = "bad"
+        collector.syntaxError(
+            recognizer=MagicMock(),
+            offendingSymbol=mock_symbol,
+            line=1,
+            column=0,
+            msg="test error",
+            e=None,
+        )
+        assert len(collector.errors) == 1
 
-    def test_raise_if_errors_not_implemented(self) -> None:
-        """raise_if_errors() raises NotImplementedError."""
+    def test_raise_if_errors(self) -> None:
+        from spl_to_sql.exceptions import ParseError
         collector = SPLErrorCollector()
-        with pytest.raises(NotImplementedError):
+        collector.errors.append(SyntaxErrorDetail(line=1, column=1, message="test"))
+        with pytest.raises(ParseError):
             collector.raise_if_errors()
