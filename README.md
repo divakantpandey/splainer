@@ -7,6 +7,66 @@
 
 Translate Splunk SPL (Search Processing Language) queries into SQL.
 
+## Usage
+
+Translate queries using the CLI interface. By default, it prints out the rich intermediate transformation tree:
+
+```bash
+uv run spl-to-sql translate 'search index=main (status=200 OR status IN (301, 302)) NOT error | stats sum(bytes) AS total_bytes by host'
+```
+
+**Output:**
+
+```
+Translating query: search index=main (status=200 OR status IN (301, 302)) NOT error | stats sum(bytes) AS total_bytes by host
+Pipeline: search index=main (status=200 OR status IN (301, 302)) NOT error | stats sum(bytes) AS total_bytes by host
+├── SPL IR
+│   ├── Stage 1: search
+│   │   └── Expression: source_text='' left=BinaryOp(source_text='', 
+│   │       left=BinaryOp(source_text='', left=FieldRef(source_text='', 
+│   │       field_name='index'), op='=', right=Literal(source_text='', 
+│   │       value='main')), op='AND', right=BinaryOp(source_text='', 
+│   │       left=BinaryOp(source_text='', left=FieldRef(source_text='', 
+│   │       field_name='status'), op='=', right=Literal(source_text='', 
+│   │       value=200)), op='OR', right=InExpr(source_text='', 
+│   │       field=FieldRef(source_text='', field_name='status'), 
+│   │       values=[Literal(source_text='', value=301), Literal(source_text='', 
+│   │       value=302)]))) op='AND' right=UnaryOp(source_text='', op='NOT', 
+│   │       expr=BinaryOp(source_text='', left=FieldRef(source_text='', 
+│   │       field_name='_raw'), op='=', right=Literal(source_text='', 
+│   │       value='error')))
+│   └── Stage 2: stats
+│       ├── Aggregations: sum(bytes)
+│       └── Group By: host
+├── Relational IR
+│   ├── FROM: main
+│   ├── WHERE: (((index = 'main') AND ((status = 200) OR status IN (301, 302))) 
+│   │   AND NOT ((_raw = 'error')))
+│   ├── SELECT: SUM(bytes) AS total_bytes, host
+│   └── GROUP BY: host
+└── Generated SQL
+    └── SELECT SUM(bytes) AS total_bytes, host
+        FROM main
+        WHERE (((index = 'main') AND ((status = 200) OR status IN (301, 302))) 
+        AND NOT ((_raw = 'error')))
+        GROUP BY host;
+```
+
+To just print the generated SQL without the tree, you can use `--no-show-tree`:
+```bash
+uv run spl-to-sql translate "search index=main | stats count by sourcetype" --no-show-tree
+```
+
+## Minimum Viable Product (MVP) Features
+
+`spl-to-sql` now supports a foundational end-to-end pipeline covering core SPL semantics.
+
+* **ANTLR4 Powered Parser**: Fully parses basic commands like `search` and `stats`.
+* **Advanced Expressions**: Accurately constructs nested expression trees for conditions incorporating implicit `AND`, explicit `OR`, `NOT`, and `IN` operators.
+* **Aggregations**: Handles grouping (`GROUP BY`) and multiple aggregations natively mapped to their relational counterparts (e.g., `stats count`, `sum(bytes)`).
+* **Rich AST Visualization**: Prints an integrated, terminal-friendly tree view showing exactly how your SPL query transforms at each pipeline stage.
+* **Deterministic SQL Codegen**: Emits standard SQL deterministically.
+
 ## Architecture Overview
 
 `spl-to-sql` follows a multi-stage compiler pipeline:
@@ -39,14 +99,6 @@ To install with dev/test dependencies:
 
 ```bash
 uv sync --extra dev --extra test
-```
-
-## Usage
-
-> **Note:** This project is in early scaffolding stage. The CLI and pipeline are not yet implemented.
-
-```bash
-uv run spl-to-sql translate "search index=main | stats count by host"
 ```
 
 ## Test Infrastructure (Splunk & MySQL)
