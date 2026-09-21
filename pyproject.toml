@@ -35,6 +35,8 @@ dependencies = [
     "alembic>=1.13.0",
     "pymysql>=1.1.0",
     "cryptography>=42.0.0",
+    "rich>=15.0.0",
+    "openai>=3.16.2",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +44,7 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
+    "antlr4-tools",
 ]
 test = [
     "pytest",
