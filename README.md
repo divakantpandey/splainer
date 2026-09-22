@@ -64,8 +64,35 @@ uv run spl-to-sql translate "search index=main | stats count by sourcetype" --no
 * **ANTLR4 Powered Parser**: Fully parses basic commands like `search` and `stats`.
 * **Advanced Expressions**: Accurately constructs nested expression trees for conditions incorporating implicit `AND`, explicit `OR`, `NOT`, and `IN` operators.
 * **Aggregations**: Handles grouping (`GROUP BY`) and multiple aggregations natively mapped to their relational counterparts (e.g., `stats count`, `sum(bytes)`).
+* **Tier 1 SPL Commands Supported**: Deterministically translates `search`, `where`, `eval`, `stats`, `sort`, `head`, `tail`, `rename`, `table`, `fields`, `dedup`, `top`, and `rare`.
 * **Rich AST Visualization**: Prints an integrated, terminal-friendly tree view showing exactly how your SPL query transforms at each pipeline stage.
-* **Deterministic SQL Codegen**: Emits standard SQL deterministically.
+* **Deterministic SQL Codegen**: Emits standard SQL deterministically for recognized commands.
+* **LLM Semantic Fallback**: Automatically falls back to an AI compiler (via standard OpenAI models or local LLMs) when encountering unhandled/complex SPL commands.
+
+### LLM Fallback Codegen (Hybrid Compilation)
+
+When the deterministic translation engine encounters an SPL command it cannot safely lower to Relational IR (e.g. `transaction`, `append`), it gracefully fails over to a Language Model to semantically bridge the gap.
+
+**Using Standard Providers (OpenAI, etc.)**
+Set your API key as an environment variable:
+```bash
+export SPL_TO_SQL_LLM__API_KEY="sk-..."
+export SPL_TO_SQL_LLM__MODEL_NAME="gpt-4o"
+```
+
+**Using Local Models (Ollama, vLLM, LM Studio)**
+Local models offer full privacy and zero costs. You can point the client to any OpenAI-compatible local server. An API key is not required when a custom base URL is specified:
+
+```bash
+# E.g. using a local Ollama server running mistral
+export SPL_TO_SQL_LLM__BASE_URL="http://localhost:11434/v1"
+export SPL_TO_SQL_LLM__MODEL_NAME="mistral"
+```
+
+Run an unsupported command and watch it seamlessly fall back:
+```bash
+uv run spl-to-sql translate 'search index=main | transaction host'
+```
 
 ## Architecture Overview
 

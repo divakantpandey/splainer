@@ -59,38 +59,41 @@ def format_translation_prompt(
     relational_ir_json: str,
     dialect: str,
 ) -> str:
-    """Format a translation prompt for the LLM.
+    """Format a translation prompt for the LLM."""
+    return f"""You are a SQL generation assistant. Given an SPL query and partial relational structure, generate a valid SQL query in {dialect}.
 
-    Args:
-        spl_description: Human-readable description of the SPL query intent.
-        relational_ir_json: JSON representation of the partial Relational IR.
-        dialect: Target SQL dialect name.
+Rules:
+- Output ONLY the SQL query, no explanations.
+- Use {dialect} syntax and proper identifier quoting.
+- Ensure the semantics of the SPL query are perfectly translated.
 
-    Returns:
-        The formatted prompt string.
+Original SPL query:
+{spl_description}
 
-    TODO: Add few-shot examples to the prompt.
-    """
-    # TODO: Implement proper prompt formatting
-    raise NotImplementedError("Prompt formatting not yet implemented")
+Partial Relational Structure:
+{relational_ir_json}
 
+SQL:"""
 
 def format_error_correction_prompt(
     sql: str,
     error_message: str,
     dialect: str,
 ) -> str:
-    """Format an error correction prompt for the LLM.
+    """Format an error correction prompt for the LLM."""
+    return f"""The following {dialect} SQL query failed to execute. Please correct it.
 
-    Args:
-        sql: The SQL query that failed.
-        error_message: The database error message.
-        dialect: Target SQL dialect name.
+Original SQL:
+```sql
+{sql}
+```
 
-    Returns:
-        The formatted prompt string.
+Error message:
+{error_message}
 
-    TODO: Implement proper prompt formatting with error context.
-    """
-    # TODO: Implement prompt formatting
-    raise NotImplementedError("Error correction prompt formatting not yet implemented")
+Target dialect: {dialect}
+
+Rules:
+- Output ONLY the corrected SQL query without any markdown formatting or explanations.
+
+Corrected SQL:"""
