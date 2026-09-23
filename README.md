@@ -9,7 +9,7 @@ Translate Splunk SPL (Search Processing Language) queries into SQL.
 
 ## Usage
 
-Translate queries using the CLI interface. By default, it prints out the rich intermediate transformation tree:
+Translate queries using the CLI interface. By default, it runs through the **LangGraph Agent Pipeline** and prints out a rich intermediate transformation tree showing routing decisions and execution timings:
 
 ```bash
 uv run spl-to-sql translate 'search index=main (status=200 OR status IN (301, 302)) NOT error | stats sum(bytes) AS total_bytes by host'
@@ -18,99 +18,154 @@ uv run spl-to-sql translate 'search index=main (status=200 OR status IN (301, 30
 **Output:**
 
 ```
-Translating query: search index=main (status=200 OR status IN (301, 302)) NOT error | stats sum(bytes) AS total_bytes by host
-Pipeline: search index=main (status=200 OR status IN (301, 302)) NOT error | stats sum(bytes) AS total_bytes by host
-├── SPL IR
-│   ├── Stage 1: search
-│   │   └── Expression: source_text='' left=BinaryOp(source_text='', 
-│   │       left=BinaryOp(source_text='', left=FieldRef(source_text='', 
-│   │       field_name='index'), op='=', right=Literal(source_text='', 
-│   │       value='main')), op='AND', right=BinaryOp(source_text='', 
-│   │       left=BinaryOp(source_text='', left=FieldRef(source_text='', 
-│   │       field_name='status'), op='=', right=Literal(source_text='', 
-│   │       value=200)), op='OR', right=InExpr(source_text='', 
-│   │       field=FieldRef(source_text='', field_name='status'), 
-│   │       values=[Literal(source_text='', value=301), Literal(source_text='', 
-│   │       value=302)]))) op='AND' right=UnaryOp(source_text='', op='NOT', 
-│   │       expr=BinaryOp(source_text='', left=FieldRef(source_text='', 
-│   │       field_name='_raw'), op='=', right=Literal(source_text='', 
-│   │       value='error')))
-│   └── Stage 2: stats
-│       ├── Aggregations: sum(bytes)
-│       └── Group By: host
-├── Relational IR
-│   ├── FROM: main
-│   ├── WHERE: (((index = 'main') AND ((status = 200) OR status IN (301, 302))) 
-│   │   AND NOT ((_raw = 'error')))
-│   ├── SELECT: SUM(bytes) AS total_bytes, host
-│   └── GROUP BY: host
-└── Generated SQL
+🤖 spl-to-sql Agent Pipeline
+├── ✅ parse_node (1.9ms)
+│   └── Successfully parsed SPL query
+├── ✅ ir_build_node (0.2ms)
+│   └── Built SPL IR with 2 stages: search, stats
+├── ✅ lowering_node (0.0ms)
+│   └── Successfully lowered to Relational IR
+├── ✅ codegen_deterministic_node (0.0ms)
+│   └── Successfully generated SQL
+└── 📝 Generated SQL
     └── SELECT SUM(bytes) AS total_bytes, host
         FROM main
-        WHERE (((index = 'main') AND ((status = 200) OR status IN (301, 302))) 
-        AND NOT ((_raw = 'error')))
+        WHERE (((status = 200) OR status IN (301, 302)) AND NOT ((_raw = 'error')))
         GROUP BY host;
 ```
 
-To just print the generated SQL without the tree, you can use `--no-show-tree`:
+### Automatic Validation & LLM Feedback Loop
+Pass the `--execute` flag to automatically run the generated SQL against your target database. If the database rejects the query (e.g. invalid syntax or schema errors), the agent captures the remote error and loops back to the LLM to automatically fix it!
+
 ```bash
-uv run spl-to-sql translate "search index=main | stats count by sourcetype" --no-show-tree
+uv run spl-to-sql translate "search index=app | transaction request_id | where duration > 5" --dialect mysql --execute
 ```
+
+**Feedback Loop Output:**
+```text
+🤖 spl-to-sql Agent Pipeline
+├── ✅ parse_node (2.0ms)
+├── ✅ ir_build_node (0.2ms)
+├── ⚠️ lowering_node (0.0ms)
+│   └── Lowering unsupported: UnknownCommand
+├── ✅ codegen_llm_node (4.0s)
+│   └── Successfully generated SQL with LLM
+├── ❌ validate_node (81.0ms)
+│   └── Execution failed: (1054, "Unknown column 'duration' in 'field list'")
+├── ✅ validate_fix_node (3.4s)
+│   └── LLM corrected SQL query based on DB schema error
+├── ✅ validate_node (30.0ms)
+│   └── Query execution successful
+├── 📝 Generated SQL
+│   └── SELECT `request_id`, TIMESTAMPDIFF(SECOND, MIN(`timestamp`), MAX(`timestamp`)) AS duration
+│       FROM `app`
+│       GROUP BY `request_id` HAVING duration > 5;
+└── 📊 Results (1 rows)
+    └── ┏━━━━━━━━━━━━┳━━━━━━━━━━┓
+        ┃ request_id ┃ duration ┃
+        ┡━━━━━━━━━━━━╇━━━━━━━━━━┩
+        │ REQ-1001   │       10 │
+        └────────────┴──────────┘
+```
+
+### Visualizing the Architecture
+Pass the `--draw-graph` flag to view the state machine's decision flow directly in your terminal:
+
+```bash
+uv run spl-to-sql translate "search index=main" --draw-graph
+```
+
+**Graph Output:**
+```text
+🤖 Agent Pipeline Architecture:
+                                                             +-----------+                                                    
+                                                             | __start__ |                                                    
+                                                             +-----------+                                                    
+                                                                   *                                                          
+                                                               +-------+....                                                  
+                                                              .| parse |... .........                                         
+                                                           ... +-------+   ......    .........                                
+                                       +----------+                                                ....                 ..... 
+                                       | ir_build |                                                   .                     . 
+                                       +----------+                                                   .                     . 
+                                             *                                                        .                     . 
+                                       +----------+                                                   .                     . 
+                                       | lowering |..                                                 .                     . 
+                                       +----------+  ......                                           .                     . 
+                  +-----------------------+                                  ...                      .                     . 
+                  | codegen_deterministic |.                                   .                      .                     . 
+                  +-----------------------+ ........                           .                      .                     . 
+                    .                                ..                 +-------------+               .                     . 
+                    .                                 .            .....| codegen_llm |               .                     . 
+                    .                                 .............     +-------------+               .                     . 
+              +----------+                            .                        .                      .                     . 
+              | validate |                            .                        .                       ..                 ..  
+              +----------+                            .                        .                         ..             ..    
+             ...         ...                          .                        .                           ..         ..      
++--------------+                ...                   ..                       .                          +-----------+       
+| validate_fix |......             ......               ..                  ...                        ...| parse_fix |       
++--------------+      ...........        ......           ..               .                    .......   +-----------+       
+                                 ..........    ......       ..          ...            .........                              
+                                                      ........  ..   ..    .....                                              
+                                                           +---------------+                                                  
+                                                           | render_output |                                                  
+                                                           +---------------+                                                  
+                                                                   *                                                          
+                                                              +---------+                                                     
+                                                              | __end__ |                                                     
+                                                              +---------+  
+```
+
+### CLI Flags
+* `--execute` / `--no-execute`: Validate the generated SQL against the actual database.
+* `--dialect [postgres|snowflake|mysql]`: Target SQL dialect (default: postgres).
+* `--draw-graph`: Render the ASCII architecture diagram of the LangGraph agents.
+* `--no-show-tree`: Skip the visual tree and print only the raw SQL (useful for piping `> output.sql`).
 
 ## Minimum Viable Product (MVP) Features
 
-`spl-to-sql` now supports a foundational end-to-end pipeline covering core SPL semantics.
+`spl-to-sql` now uses a **sophisticated LangGraph orchestration pipeline** for resilient end-to-end translation.
 
-* **ANTLR4 Powered Parser**: Fully parses basic commands like `search` and `stats`.
+* **Agentic Orchestration**: Uses LangGraph to route queries dynamically between deterministic compilers and LLM fallback paths.
+* **Auto-Recovery Loop**: Executes queries remotely and automatically uses LLMs to fix schema or syntax errors based on live DB feedback.
+* **ANTLR4 Powered Parser**: Fully parses basic commands like `search` and `stats`, with automatic syntax-correction LLM loops on parsing failure.
 * **Advanced Expressions**: Accurately constructs nested expression trees for conditions incorporating implicit `AND`, explicit `OR`, `NOT`, and `IN` operators.
-* **Aggregations**: Handles grouping (`GROUP BY`) and multiple aggregations natively mapped to their relational counterparts (e.g., `stats count`, `sum(bytes)`).
 * **Tier 1 SPL Commands Supported**: Deterministically translates `search`, `where`, `eval`, `stats`, `sort`, `head`, `tail`, `rename`, `table`, `fields`, `dedup`, `top`, and `rare`.
-* **Rich AST Visualization**: Prints an integrated, terminal-friendly tree view showing exactly how your SPL query transforms at each pipeline stage.
-* **Deterministic SQL Codegen**: Emits standard SQL deterministically for recognized commands.
-* **LLM Semantic Fallback**: Automatically falls back to an AI compiler (via standard OpenAI models or local LLMs) when encountering unhandled/complex SPL commands.
+* **Rich AST Visualization**: Prints an integrated, terminal-friendly tree view showing agent routing and transformation steps.
+* **Dialect Support**: Configurable generation for `postgres`, `snowflake`, and `mysql`.
 
 ### LLM Fallback Codegen (Hybrid Compilation)
 
 When the deterministic translation engine encounters an SPL command it cannot safely lower to Relational IR (e.g. `transaction`, `append`), it gracefully fails over to a Language Model to semantically bridge the gap.
 
+**Configuration Auto-Loading**
+Configuration (like database strings and API keys) is automatically loaded from your `infra/.env` file. 
+
 **Using Standard Providers (OpenAI, etc.)**
-Set your API key as an environment variable:
+Add to `infra/.env`:
 ```bash
-export SPL_TO_SQL_LLM__API_KEY="sk-..."
-export SPL_TO_SQL_LLM__MODEL_NAME="gpt-4o"
+SPL_TO_SQL_LLM__API_KEY="sk-..."
+SPL_TO_SQL_LLM__MODEL_NAME="gpt-4o"
 ```
 
 **Using Local Models (Ollama, vLLM, LM Studio)**
-Local models offer full privacy and zero costs. You can point the client to any OpenAI-compatible local server. An API key is not required when a custom base URL is specified:
-
+Local models offer full privacy and zero costs. Just provide your base URL in `infra/.env` (no API key required!):
 ```bash
-# E.g. using a local Ollama server running mistral
-export SPL_TO_SQL_LLM__BASE_URL="http://localhost:11434/v1"
-export SPL_TO_SQL_LLM__MODEL_NAME="mistral"
-```
-
-Run an unsupported command and watch it seamlessly fall back:
-```bash
-uv run spl-to-sql translate 'search index=main | transaction host'
+SPL_TO_SQL_LLM__BASE_URL="http://localhost:11434/v1"
+SPL_TO_SQL_LLM__MODEL_NAME="mistral"
 ```
 
 ## Architecture Overview
 
-`spl-to-sql` follows a multi-stage compiler pipeline:
+`spl-to-sql` follows a multi-stage LangGraph agent pipeline:
 
-1. **Parse** — SPL query string → ANTLR4 parse tree
-2. **SPL IR** — Parse tree → SPL-shaped intermediate representation (mirrors SPL semantics)
-3. **Relational IR** — SPL IR → relational-algebra-shaped IR (mirrors SQL semantics)
-4. **Codegen** — Relational IR → SQL text (deterministic rules first, LLM fallback for uncovered constructs)
-5. **Execute** — Run generated SQL against target DB, retry with error feedback on failure
+1. **Parse** — SPL query string → ANTLR4 parse tree (retries with LLM on syntax error)
+2. **SPL IR** — Parse tree → SPL-shaped intermediate representation
+3. **Relational IR** — SPL IR → relational-algebra-shaped IR
+4. **Codegen** — Relational IR → SQL text (deterministic rules first, routes to LLM on unsupported commands)
+5. **Validate & Fix** — Runs SQL against target DB. If it fails, routes remote error + SQL to LLM for auto-correction up to 3 times.
 
-<!-- TODO: Replace with actual architecture diagram -->
-```
-┌─────────┐    ┌─────────┐    ┌──────────────┐    ┌─────────┐    ┌─────────┐
-│  Parse  │───▶│ SPL IR  │───▶│ Relational IR│───▶│ Codegen │───▶│ Execute │
-│ (ANTLR) │    │         │    │              │    │(Rules+LLM)   │(Retry)  │
-└─────────┘    └─────────┘    └──────────────┘    └─────────┘    └─────────┘
-```
+*(Run `spl-to-sql translate "..." --draw-graph` to see the live ASCII representation of this state machine!)*
 
 ## Installation
 
