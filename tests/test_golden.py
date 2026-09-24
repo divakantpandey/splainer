@@ -21,10 +21,17 @@ def test_golden_queries(spl_filename: str):
     expected_path = EXPECTED_DIR / f"{spl_filename.replace('.spl', '.sql')}"
     
     spl_query = spl_path.read_text().strip()
+    expected_sql = expected_path.read_text().strip()
     
-    # Skip if translate is not implemented yet
-    pytest.skip("Pipeline not fully implemented yet")
+    from spl_to_sql.parser import parse
+    from spl_to_sql.ir.spl_ir.builder import build_spl_ir
+    from spl_to_sql.ir.relational_ir.lowering import lower_to_relational
+    from spl_to_sql.codegen.deterministic import generate_sql
     
-    # result = translate(spl_query, dialect="postgres", config=...)
-    # assert result.sql.strip() == expected_sql.strip()
+    tree = parse(spl_query)
+    spl_ir = build_spl_ir(tree)
+    relational_ir = lower_to_relational(spl_ir)
+    sql = generate_sql(relational_ir)
+    
+    assert sql.strip() == expected_sql
 
