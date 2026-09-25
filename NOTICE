@@ -1,0 +1,58 @@
+# NOTICE
+
+**spl-to-sql (splainer)**
+Copyright 2023-2026 Divakant Pandey (and/or contributors)
+
+This product includes software developed by Divakant Pandey and contributors.
+
+---
+
+## 1. Authorship & Contributions
+- **Original Author / Creator:** Divakant Pandey
+- **Contributors:** [List any major contributors or point to CONTRIBUTORS.md]
+- **Contributors:** See the git commit history for a complete list of contributors.
+
+---
+
+## 2. Patent Rights & Grant
+This software is provided under the terms of the **Apache License 2.0**, which includes an explicit grant of patent rights from contributors to users. 
+
+*Standard Practice Note:* Under Section 3 of the Apache License 2.0, each contributor grants you a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except for patent litigation) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the Work. Any institution of patent litigation against any entity alleging that the software constitutes direct or contributory patent infringement will immediately terminate your patent grants for this software.
+
+---
+
+## 3. Distribution & "No Closed-Sourcing" Condition (Please Read Note Below)
+## 3. Distribution & "No Closed-Sourcing" Condition
+**Notice regarding derivative works:**
+If you modify, distribute, or create derivative works of this software, you are strongly encouraged (or required, depending on any supplementary license applied) to release your modifications under the same open-source terms. 
+If you modify, distribute, or create derivative works of this software, you are strongly encouraged to release your modifications under the same open-source terms. 
+
+*Optional Restrictive Clause (e.g., Commons Clause or AGPL-style intention):*
+*Restrictive Clause:*
+> The software is provided on the condition that derivative works, integrations, or modifications distributed to third parties or offered as a service (SaaS) must remain open-source and make their source code available to users. Closed-sourcing of this software or its core components is expressly prohibited.
+
+**(⚠️ See the warning in the chat about how this interacts with your Apache 2.0 license)**
+
+---
+
+## 4. Third-Party Software Attributions
+*Standard Practice: List any third-party libraries you use that require attribution here.*
+
+This software depends on several open-source libraries, which are governed by their respective licenses. 
+- **[Library Name]** - Copyright [Year] [Author] - Licensed under [License, e.g., MIT]
+- *(Add any specific notices required by your dependencies here)*
+This software depends on several open-source libraries, which are governed by their respective licenses:
+
+- **antlr4-python3-runtime** - Licensed under the BSD License
+- **Pydantic** - Copyright (c) 2017 to present Pydantic Services Inc. and contributors - Licensed under the MIT License
+- **Click** - Copyright 2014 Pallets - Licensed under the BSD License
+- **SQLAlchemy** - Copyright 2005-2023 SQLAlchemy authors and contributors - Licensed under the MIT License
+- **Alembic** - Copyright 2010-2023 Mike Bayer et al - Licensed under the MIT License
+- **PyMySQL** - Copyright (c) 2010, 2013 PyMySQL contributors - Licensed under the MIT License
+- **OpenAI Python Library** - Copyright (c) OpenAI - Licensed under the Apache License 2.0
+- **LangGraph** - Licensed under the MIT License
+- **Tenacity** - Copyright 2016 Julien Danjou - Licensed under the Apache License 2.0
+- **Rich** - Copyright (c) 2020 Will McGugan - Licensed under the MIT License
+- **Cryptography** - Dual licensed under the Apache License 2.0 and BSD License
+
+---
