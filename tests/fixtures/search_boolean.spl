@@ -1,0 +1,2 @@
+search index=security (action="blocked" OR action="denied") AND src_ip!="10.0.0.*"
+
