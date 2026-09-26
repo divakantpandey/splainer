@@ -1,0 +1,1 @@
+search index=network | eval duration_seconds = duration / 1000

@@ -1,0 +1,2 @@
+search index=main | stats count by status_code | rename count as total_requests, status_code as HTTP_Status | sort - total_requests
+
