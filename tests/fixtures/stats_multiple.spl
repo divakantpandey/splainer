@@ -1,0 +1,2 @@
+search index=sales | stats count, sum(price) as total_revenue, avg(duration) by category, region
+
