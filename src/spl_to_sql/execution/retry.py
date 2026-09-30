@@ -1,22 +1,23 @@
 """Exponential backoff retry wrapper.
 
 Wraps SQL execution with tenacity-based exponential backoff and jitter.
-Retry attempts are bounded by a configurable maximum, and each failed
-attempt's error is captured for the feedback loop.
-
-Backoff strategy:
-- Exponential with configurable base delay and max delay cap.
-- Random jitter to avoid thundering herd.
-- Max attempt ceiling (default: 3, configurable via RetryConfig).
-- Each attempt captures the execution error for feedback.
-
-TODO: Implement actual retry logic using tenacity.
+Retry attempts are bounded by a configurable maximum.
 """
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any, TypeVar
+
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
+from spl_to_sql.exceptions import ExecutionError, RetryExhaustedError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -34,48 +35,44 @@ def with_retry(
     *args: Any,
     **kwargs: Any,
 ) -> T:
-    """Execute a function with exponential backoff retry.
+    """Execute a function with exponential backoff retry."""
+    retryer = retry(
+        stop=stop_after_attempt(config.max_attempts),
+        wait=wait_exponential_jitter(
+            initial=config.base_delay_seconds,
+            max=config.max_delay_seconds,
+            jitter=config.base_delay_seconds if config.jitter else 0,
+        ),
+        retry=retry_if_exception_type(ExecutionError),
+        before_sleep=create_retry_callback(),
+        reraise=True,
+    )
 
-    Wraps the given function with tenacity-based retry logic.
-    On each failure, captures the error for potential feedback
-    to the LLM correction loop.
-
-    Backoff behavior:
-    - Base delay: config.base_delay_seconds
-    - Max delay: config.max_delay_seconds
-    - Jitter: enabled if config.jitter is True
-    - Max attempts: config.max_attempts
-
-    Args:
-        func: The function to execute with retry.
-        config: Retry configuration (delays, max attempts, jitter).
-        *args: Positional arguments passed to func.
-        **kwargs: Keyword arguments passed to func.
-
-    Returns:
-        The return value of func on success.
-
-    Raises:
-        RetryExhaustedError: If all retry attempts fail.
-
-    TODO: Implement using tenacity decorators.
-    """
-    # TODO: Implement tenacity-based retry
-    raise NotImplementedError("Retry logic not yet implemented")
+    try:
+        return retryer(func)(*args, **kwargs)
+    except RetryError as e:
+        last = e.last_attempt.exception() if e.last_attempt else None
+        raise RetryExhaustedError(
+            message=f"All {config.max_attempts} retry attempts exhausted",
+            attempts=config.max_attempts,
+            last_error=last if isinstance(last, ExecutionError) else None,
+        ) from e
 
 
 def create_retry_callback(
     on_retry: Callable[[int, Exception], None] | None = None,
 ) -> Callable[[Any], None]:
-    """Create a callback invoked after each failed retry attempt.
+    """Create a callback invoked after each failed retry attempt."""
 
-    Args:
-        on_retry: Optional callback receiving (attempt_number, exception).
+    def _before_sleep(retry_state: Any) -> None:
+        attempt = retry_state.attempt_number
+        exc = retry_state.outcome.exception() if retry_state.outcome else None
+        logger.warning(
+            "Retry attempt %d failed: %s. Retrying...",
+            attempt,
+            exc,
+        )
+        if on_retry is not None and exc is not None:
+            on_retry(attempt, exc)
 
-    Returns:
-        A tenacity-compatible retry callback.
-
-    TODO: Implement callback creation.
-    """
-    # TODO: Implement
-    raise NotImplementedError("Retry callback not yet implemented")
+    return _before_sleep
