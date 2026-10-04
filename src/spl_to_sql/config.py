@@ -25,6 +25,7 @@ class SqlDialect(StrEnum):
 
     POSTGRES = "postgres"
     SNOWFLAKE = "snowflake"
+    MYSQL = "mysql"
 
 
 class LLMProviderConfig(BaseSettings):
@@ -69,6 +70,24 @@ class RetryConfig(BaseSettings):
     jitter: bool = True
 
 
+
+class AgentConfig(BaseSettings):
+    """Configuration for agent pipeline behavior.
+
+    Attributes:
+        enabled: Whether to use agent-based orchestration.
+        max_fix_attempts: Maximum LLM fix attempts per agent.
+        console_tree_enabled: Show Rich console tree output.
+
+    """
+
+    model_config = {"env_prefix": "AGENT_"}
+
+    enabled: bool = True
+    max_fix_attempts: int = 3
+    console_tree_enabled: bool = True
+
+
 class DatabaseConfig(BaseSettings):
     """Configuration for the target database connection.
 
@@ -100,10 +119,32 @@ class SplToSqlConfig(BaseSettings):
     TODO: Implement configuration file loading (e.g., from ~/.spl-to-sql/config.toml).
     """
 
-    model_config = {"env_prefix": "SPL_TO_SQL_"}
+    model_config = {
+        "env_prefix": "SPL_TO_SQL_",
+        "env_nested_delimiter": "__",
+        "env_file": "infra/.env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
     dialect: SqlDialect = SqlDialect.POSTGRES
-    llm: LLMProviderConfig = LLMProviderConfig()
-    retry: RetryConfig = RetryConfig()
-    database: DatabaseConfig = DatabaseConfig()
-    log_level: str = "INFO"
+    from pydantic import Field
+    
+    llm: LLMProviderConfig | None = None
+    retry: RetryConfig = Field(default_factory=RetryConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    log_level: str = "WARNING"
+
+    @classmethod
+    def from_env(cls) -> "SplToSqlConfig":
+        """Load configuration from environment variables."""
+        import dotenv
+        from pathlib import Path
+        
+        # Load the infra/.env file globally so all nested Configs (like DatabaseConfig)
+        # can read their specific prefixes (e.g. DB_CONNECTION_STRING).
+        env_path = Path(__file__).parent.parent.parent / "infra" / ".env"
+        dotenv.load_dotenv(env_path)
+        
+        return cls()
