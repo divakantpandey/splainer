@@ -117,3 +117,11 @@ source = ["spl_to_sql"]
 [tool.coverage.report]
 fail_under = 0
 show_missing = true
+
+[tool.uv.workspace]
+members = [".", "packages/*"]
+
+[tool.uv.sources]
+spl-to-sql = { workspace = true }
+splainer-sdk = { workspace = true }
+splainer-api = { workspace = true }
