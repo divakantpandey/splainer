@@ -1,15 +1,12 @@
 """Pydantic models for SPL IR nodes.
 
 These models represent the SPL-shaped intermediate representation.
-Each node type corresponds to a concept in SPL's semantics.
-
-TODO: Add more node types as SPL commands are supported.
-TODO: Add validation rules to pydantic models.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -17,106 +14,125 @@ logger = logging.getLogger(__name__)
 
 
 class SPLNode(BaseModel):
-    """Base class for all SPL IR nodes.
-
-    Attributes:
-        source_text: Original SPL text fragment this node was derived from.
-
-    TODO: Add source location tracking (line/col) for error messages.
-    """
-
     source_text: str = ""
 
 
-class FieldReference(SPLNode):
-    """Reference to a field (column) in the SPL data model.
+# --- Expressions ---
+class Expression(SPLNode):
+    pass
 
-    Attributes:
-        field_name: The name of the field being referenced.
-
-    TODO: Add field type inference support.
-    """
-
+class FieldRef(Expression):
     field_name: str
 
+class Literal(Expression):
+    value: Any
 
-class EvalExpression(SPLNode):
-    """An eval expression in SPL (e.g., ``eval new_field=old_field * 2``).
+class BinaryOp(Expression):
+    left: Expression
+    op: str
+    right: Expression
 
-    Attributes:
-        target_field: The field being assigned to.
-        expression_text: The raw expression text (unparsed for now).
+class UnaryOp(Expression):
+    op: str
+    expr: Expression
 
-    TODO: Parse expression_text into a proper expression tree.
-    """
+class FunctionCall(Expression):
+    function_name: str
+    args: list[Expression] = []
 
+class WildcardExpr(Expression):
+    pattern: str
+
+class InExpr(Expression):
+    field: Expression
+    values: list[Expression]
+
+# --- Commands ---
+class EvalAssignment(SPLNode):
     target_field: str
-    expression_text: str
+    expression: Expression
 
+class EvalCommand(SPLNode):
+    assignments: list[EvalAssignment]
 
 class SearchCommand(SPLNode):
-    """The implicit or explicit 'search' command.
-
-    Attributes:
-        search_expression: The search filter expression text.
-        index: Optional index name constraint.
-        sourcetype: Optional sourcetype constraint.
-
-    TODO: Parse search_expression into structured filter predicates.
-    """
-
-    search_expression: str
+    expression: Expression | None
     index: str | None = None
     sourcetype: str | None = None
 
+class AggregationFunc(SPLNode):
+    function_name: str
+    field: Expression | None
+    alias: str | None = None
 
 class StatsCommand(SPLNode):
-    """The 'stats' command for aggregation.
-
-    Attributes:
-        aggregations: List of aggregation function calls (e.g., 'count', 'avg(field)').
-        group_by_fields: Fields to group by.
-
-    TODO: Parse aggregation functions into structured representations.
-    """
-
-    aggregations: list[str]
-    group_by_fields: list[str] = []
-
+    aggregations: list[AggregationFunc]
+    group_by: list[Expression] = []
 
 class SortCommand(SPLNode):
-    """The 'sort' command for ordering results.
-
-    Attributes:
-        fields: Fields to sort by, with optional '-' prefix for descending.
-
-    TODO: Parse sort direction into a structured enum.
-    """
-
     fields: list[str]
+
+class WhereCommand(SPLNode):
+    expression: Expression
+
+class TableCommand(SPLNode):
+    fields: list[str]
+
+class FieldsCommand(SPLNode):
+    fields: list[str]
+    keep: bool = True
+
+class HeadCommand(SPLNode):
+    count: int
+
+class TailCommand(SPLNode):
+    count: int
+
+class RenameItem(SPLNode):
+    old_name: str
+    new_name: str
+
+class RenameCommand(SPLNode):
+    renames: list[RenameItem]
+
+class DedupCommand(SPLNode):
+    fields: list[str]
+
+class TopCommand(SPLNode):
+    limit: int | None = None
+    field: str
+    by: list[str] = []
+
+class RareCommand(SPLNode):
+    limit: int | None = None
+    field: str
+    by: list[str] = []
+
+class UnknownCommand(SPLNode):
+    command_name: str
+    raw_text: str
 
 
 class PipelineStage(SPLNode):
-    """A single stage (command) in the SPL pipeline.
-
-    Attributes:
-        command: The command node (SearchCommand, StatsCommand, etc.).
-        command_name: The name of the SPL command.
-
-    TODO: Use a proper union type for command once all command types exist.
-    """
-
     command_name: str
-    command: SearchCommand | StatsCommand | SortCommand | EvalExpression
+    command: (
+        SearchCommand
+        | StatsCommand
+        | SortCommand
+        | EvalCommand
+        | WhereCommand
+        | TableCommand
+        | FieldsCommand
+        | HeadCommand
+        | TailCommand
+        | RenameCommand
+        | DedupCommand
+        | TopCommand
+        | RareCommand
+        | UnknownCommand
+    )
 
 
 class SPLPipeline(SPLNode):
-    """Root node representing a complete SPL pipeline (query).
-
-    Attributes:
-        stages: Ordered list of pipeline stages.
-
-    TODO: Add pipeline-level validation.
-    """
-
     stages: list[PipelineStage]
+
