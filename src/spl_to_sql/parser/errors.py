@@ -32,7 +32,10 @@ class SyntaxErrorDetail:
     offending_symbol: str | None = None
 
 
-class SPLErrorCollector:
+from antlr4.error.ErrorListener import ErrorListener
+from spl_to_sql.exceptions import ParseError
+
+class SPLErrorCollector(ErrorListener):
     """Collects syntax errors during ANTLR4 parsing.
 
     Designed to be used as an ANTLR4 error listener. Collects all
@@ -41,36 +44,31 @@ class SPLErrorCollector:
 
     Attributes:
         errors: List of syntax errors collected during parsing.
-
-    TODO: Subclass ANTLR4's BaseErrorListener once generated code exists.
     """
 
     def __init__(self) -> None:
+        super().__init__()
         self.errors: list[SyntaxErrorDetail] = []
 
-    def syntax_error(
+    def syntaxError(
         self,
         recognizer: Any,
-        offending_symbol: Any,
+        offendingSymbol: Any,
         line: int,
         column: int,
         msg: str,
         e: Any,
     ) -> None:
-        """Called by ANTLR4 when a syntax error is encountered.
-
-        Args:
-            recognizer: The ANTLR4 recognizer (lexer or parser).
-            offending_symbol: The offending token.
-            line: Line number of the error.
-            column: Column offset of the error.
-            msg: ANTLR4's error message.
-            e: The underlying RecognitionException, if any.
-
-        TODO: Implement error collection logic.
-        """
-        # TODO: Implement syntax error collection
-        raise NotImplementedError("Syntax error collection not yet implemented")
+        """Called by ANTLR4 when a syntax error is encountered."""
+        symbol_text = offendingSymbol.text if offendingSymbol else None
+        self.errors.append(
+            SyntaxErrorDetail(
+                line=line,
+                column=column,
+                message=msg,
+                offending_symbol=symbol_text,
+            )
+        )
 
     def raise_if_errors(self) -> None:
         """Raise a ParseError if any syntax errors were collected.
@@ -78,8 +76,14 @@ class SPLErrorCollector:
         Raises:
             ParseError: If one or more syntax errors were collected,
                 with a formatted multi-line error message.
-
-        TODO: Implement error formatting and raising.
         """
-        # TODO: Implement
-        raise NotImplementedError("Error raising not yet implemented")
+        if not self.errors:
+            return
+            
+        messages = []
+        for err in self.errors:
+            symbol_info = f" at '{err.offending_symbol}'" if err.offending_symbol else ""
+            messages.append(f"Line {err.line}:{err.column}{symbol_info} - {err.message}")
+            
+        full_message = "Syntax errors found during parsing:\n" + "\n".join(messages)
+        raise ParseError(full_message)
