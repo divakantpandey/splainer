@@ -7,7 +7,8 @@ for its logger instance — never ``print()``.
 TODO: Implement structured logging (JSON output) option.
 TODO: Add log-level override per module.
 """
-
+import logging
+import sys
 
 def configure_logging(level: str = "INFO") -> None:
     """Configure the root logger for spl-to-sql.
@@ -21,5 +22,23 @@ def configure_logging(level: str = "INFO") -> None:
     TODO: Implement structured JSON logging option.
     TODO: Add file handler support.
     """
-    # TODO: Implement logging configuration
-    raise NotImplementedError("Logging configuration not yet implemented")
+    numeric_level = getattr(logging, level.upper(), logging.INFO)
+    
+    from rich.logging import RichHandler
+    from rich.console import Console
+
+    # Configure Rich logging for detailed, color-coded console output
+    logging.basicConfig(
+        level=numeric_level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[
+            RichHandler(
+                console=Console(stderr=True),
+                rich_tracebacks=True,
+                show_path=True,
+                markup=True,
+            )
+        ],
+        force=True,
+    )
