@@ -1,0 +1,2 @@
+search index=app_logs | stats count by user | where count > 100
+
