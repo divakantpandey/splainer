@@ -1,0 +1,33 @@
+[project]
+name = "splainer-api"
+version = "0.1.0"
+description = "REST API for the Splainer SPL-to-SQL translation engine."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    "splainer-sdk",                # resolved via workspace
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "slowapi>=0.1.9",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "pytest-asyncio>=0.23",
+    "pytest-mock>=3.14",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+splainer-api = "splainer_api.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/splainer_api"]
+
