@@ -1,0 +1,608 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Splainer API",
+    "description": "REST API for translating Splunk SPL queries into SQL.\n\n## Features\n- **Multi-dialect** SQL generation (Postgres, Snowflake, MySQL)\n- **Hybrid compilation**: deterministic rules + LLM fallback\n- **Auto-fix loop**: executes SQL and auto-corrects errors via LLM\n- **Full pipeline introspection**: view intermediate IRs\n",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health check",
+        "description": "Returns the health status of the API and its dependencies.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dialects": {
+      "get": {
+        "tags": [
+          "Dialects"
+        ],
+        "summary": "List supported SQL dialects",
+        "operationId": "list_dialects_v1_dialects_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DialectsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/translate": {
+      "post": {
+        "tags": [
+          "Translation"
+        ],
+        "summary": "Translate SPL to SQL",
+        "description": "Translates a Splunk SPL query into the target SQL dialect. Uses deterministic compilation when possible, with LLM fallback for unsupported commands.",
+        "operationId": "translate_v1_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Translation failed (parse error, codegen error, etc.)"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/pipeline": {
+      "post": {
+        "tags": [
+          "Pipeline"
+        ],
+        "summary": "Full pipeline with intermediate results",
+        "description": "Runs the SPL query through every pipeline stage and returns intermediate representations (SPL IR, Relational IR) alongside the final SQL. Does NOT execute the query.",
+        "operationId": "pipeline_detail_v1_pipeline_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/execute": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Translate SPL and execute SQL",
+        "description": "Translates an SPL query, executes the resulting SQL against the configured database, and returns the results. Includes the LLM auto-fix feedback loop if execution fails.",
+        "operationId": "execute_v1_execute_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Translation or execution failed"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Dialect": {
+        "type": "string",
+        "enum": [
+          "postgres",
+          "snowflake",
+          "mysql"
+        ],
+        "title": "Dialect",
+        "description": "Supported SQL dialects."
+      },
+      "DialectsResponse": {
+        "properties": {
+          "dialects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dialects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dialects"
+        ],
+        "title": "DialectsResponse"
+      },
+      "ExecuteRequest": {
+        "properties": {
+          "spl_query": {
+            "type": "string",
+            "title": "Spl Query",
+            "description": "SPL query to translate and execute."
+          },
+          "dialect": {
+            "$ref": "#/components/schemas/Dialect",
+            "default": "postgres"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spl_query"
+        ],
+        "title": "ExecuteRequest"
+      },
+      "ExecuteResponse": {
+        "properties": {
+          "spl_query": {
+            "type": "string",
+            "title": "Spl Query"
+          },
+          "sql": {
+            "type": "string",
+            "title": "Sql"
+          },
+          "dialect": {
+            "type": "string",
+            "title": "Dialect"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "used_llm": {
+            "type": "boolean",
+            "title": "Used Llm",
+            "default": false
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count",
+            "default": 0
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "pipeline_steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Pipeline Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spl_query",
+          "sql",
+          "dialect",
+          "success"
+        ],
+        "title": "ExecuteResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "llm_configured": {
+            "type": "boolean",
+            "title": "Llm Configured"
+          },
+          "db_configured": {
+            "type": "boolean",
+            "title": "Db Configured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "llm_configured",
+          "db_configured"
+        ],
+        "title": "HealthStatus",
+        "description": "API health check response."
+      },
+      "PipelineDetail": {
+        "properties": {
+          "spl_query": {
+            "type": "string",
+            "title": "Spl Query"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
+          },
+          "dialect": {
+            "type": "string",
+            "title": "Dialect"
+          },
+          "spl_ir_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spl Ir Summary"
+          },
+          "relational_ir_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relational Ir Summary"
+          },
+          "used_llm": {
+            "type": "boolean",
+            "title": "Used Llm",
+            "default": false
+          },
+          "codegen_route": {
+            "type": "string",
+            "title": "Codegen Route",
+            "default": "deterministic"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spl_query",
+          "dialect"
+        ],
+        "title": "PipelineDetail",
+        "description": "Full pipeline output including intermediate representations."
+      },
+      "PipelineRequest": {
+        "properties": {
+          "spl_query": {
+            "type": "string",
+            "title": "Spl Query",
+            "description": "SPL query to process through the full pipeline."
+          },
+          "dialect": {
+            "$ref": "#/components/schemas/Dialect",
+            "default": "postgres"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spl_query"
+        ],
+        "title": "PipelineRequest"
+      },
+      "PipelineStep": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "message"
+        ],
+        "title": "PipelineStep",
+        "description": "Information about a single step in the translation pipeline."
+      },
+      "TranslateRequest": {
+        "properties": {
+          "spl_query": {
+            "type": "string",
+            "title": "Spl Query",
+            "description": "The SPL query string to translate.",
+            "examples": [
+              "search index=main | stats count by host"
+            ]
+          },
+          "dialect": {
+            "$ref": "#/components/schemas/Dialect",
+            "description": "Target SQL dialect.",
+            "default": "postgres"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spl_query"
+        ],
+        "title": "TranslateRequest",
+        "description": "Request body for SPL-to-SQL translation."
+      },
+      "TranslateResponse": {
+        "properties": {
+          "spl_query": {
+            "type": "string",
+            "title": "Spl Query"
+          },
+          "sql": {
+            "type": "string",
+            "title": "Sql"
+          },
+          "dialect": {
+            "type": "string",
+            "title": "Dialect"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "used_llm": {
+            "type": "boolean",
+            "title": "Used Llm",
+            "default": false
+          },
+          "codegen_route": {
+            "type": "string",
+            "title": "Codegen Route",
+            "default": "deterministic"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "pipeline_steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Pipeline Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spl_query",
+          "sql",
+          "dialect",
+          "success"
+        ],
+        "title": "TranslateResponse",
+        "description": "Response body for SPL-to-SQL translation."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  }
+}
